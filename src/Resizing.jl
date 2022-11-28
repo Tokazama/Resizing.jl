@@ -153,7 +153,7 @@ elements are defined. If successful this will return `true`.
 """
 function delete_at!(x, i, delta=1)
     if can_delete_at(x, i, delta)
-        unsafe_delete_at!(x, delta)
+        unsafe_delete_at!(x, i, delta)
         return true
     else
         return false
@@ -168,7 +168,7 @@ elements are defined. If successful this will return true return `true`.
 """
 function grow_at!(x, i, delta=1)
     if can_grow_at(x, i)
-        unsafe_grow_at!(x, delta)
+        unsafe_grow_at!(x, i, delta)
         return true
     else
         return false
