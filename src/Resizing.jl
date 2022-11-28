@@ -3,7 +3,8 @@ module Resizing
 import Compat: @assume_effects
 
 # https://github.com/JuliaLang/julia/issues/34478
-# TODO query if shared (`reshape`) so we can use `:nothrow`
+
+# TODO query if shared (`reshape`) so we can use `:nothrow` on `unsafe_*` methods
 # https://github.com/JuliaLang/julia/pull/47540
 
 """
@@ -37,7 +38,6 @@ Return `true` if `collection` can delete `n` elements from its first index.
 """
 can_delete_beg(x::Vector, delta) = length(x) - delta > 0
 can_delete_beg(x, delta) = false
-
 
 """
     can_delete_end(collection, n) -> Bool
@@ -191,7 +191,7 @@ function grow_end!(x, delta=1)
 end
 
 """
-    grow_beg!(x::AbstractVector{T}, n::Integer=1) -> Bool
+    grow_beg!(collection, n::Integer=1) -> Bool
 
 Grow `collection` by `n` elements from its first index. This does not ensure that new
 elements are defined. If successful thiw will return `true`.
