@@ -32,56 +32,56 @@ can_grow_at(x::Vector, i) = 1 <= i && i <= length(x)
 can_grow_at(x, i) = false
 
 """
-    can_delete_beg(collection, n) -> Bool
+    can_shrink_beg(collection, n) -> Bool
 
 Return `true` if `collection` can delete `n` elements from its first index.
 """
-can_delete_beg(x::Vector, delta) = length(x) - delta > 0
-can_delete_beg(x, delta) = false
+can_shrink_beg(x::Vector, delta) = length(x) - delta > 0
+can_shrink_beg(x, delta) = false
 
 """
-    can_delete_end(collection, n) -> Bool
+    can_shrink_end(collection, n) -> Bool
 
 Return `true` if `collection` can delete `n` elements from its last index.
 """
-can_delete_end(x::Vector, delta) = length(x) - delta > 0
-can_delete_end(x, delta) = false
+can_shrink_end(x::Vector, delta) = length(x) - delta > 0
+can_shrink_end(x, delta) = false
 
 """
-    can_delete_at(collection, i, n) -> Bool
+    can_shrink_at(collection, i, n) -> Bool
 
 Return `true` if `collection` can delete `n` elements from index, `i`.
 """
-can_delete_at(x::Vector, i, delta) = 1 <= i && (i + delta) <= length(x)
-can_delete_at(x, i, delta) = false
+can_shrink_at(x::Vector, i, delta) = 1 <= i && (i + delta) <= length(x)
+can_shrink_at(x, i, delta) = false
 
 """
-    unsafe_delete_end!(collection, n)
+    unsafe_shrink_end!(collection, n)
 
 Deletes `n` elements from the last index of `collection`. This method assumes that
-`can_delete_end(collection, n) == true`.
+`can_shrink_end(collection, n) == true`.
 """
-@assume_effects :terminates_locally function unsafe_delete_end!(x::Vector, delta)
+@assume_effects :terminates_locally function unsafe_shrink_end!(x::Vector, delta)
     ccall(:jl_array_del_end, Cvoid, (Any, UInt), x, delta)
 end
 
 """
-    unsafe_delete_beg!(collection, n)
+    unsafe_shrink_beg!(collection, n)
 
 Deletes `n` elements from the first index of `collection`. This method assumes that
-`can_delete_beg(collection, n) == true`.
+`can_shrink_beg(collection, n) == true`.
 """
-@assume_effects :terminates_locally function unsafe_delete_beg!(x::Vector, delta)
+@assume_effects :terminates_locally function unsafe_shrink_beg!(x::Vector, delta)
     ccall(:jl_array_del_beg, Cvoid, (Any, UInt), x, delta)
 end
 
 """
-    unsafe_delete_at!(collection, i, n)
+    unsafe_shrink_at!(collection, i, n)
 
 Deletes `n` elements from index `i` of `collection`. This method assumes that
-`can_delete_at(collection, i, n) == true`.
+`can_shrink_at(collection, i, n) == true`.
 """
-@assume_effects :terminates_locally function unsafe_delete_at!(x::Vector, i, delta)
+@assume_effects :terminates_locally function unsafe_shrink_at!(x::Vector, i, delta)
     ccall(:jl_array_del_at, Cvoid, (Any, Int, UInt), x, i-1, delta)
 end
 
@@ -116,14 +116,14 @@ Grows by `n` elements at index `i` of `collection`. This method assumes that
 end
 
 """
-    delete_end!(collection, n::Integer=1) -> Bool
+    shrink_end!(collection, n::Integer=1) -> Bool
 
 Deletes `n` elements from begining at the last index of `collection`.
 If successful this will return `true`.
 """
-function delete_end!(x, delta=1)
-    if can_delete_end(x, delta)
-        unsafe_delete_end!(x, delta)
+function shrink_end!(x, delta=1)
+    if can_shrink_end(x, delta)
+        unsafe_shrink_end!(x, delta)
         return true
     else
         return false
@@ -136,9 +136,9 @@ end
 Grow `collection` by `n` elements from its first index. This does not ensure that new
 elements are defined. If successful this will return `true`.
 """
-function delete_beg!(x, delta=1)
-    if can_delete_beg(x, delta)
-        unsafe_delete_beg!(x, delta)
+function shrink_beg!(x, delta=1)
+    if can_shrink_beg(x, delta)
+        unsafe_shrink_beg!(x, delta)
         return true
     else
         return false
@@ -146,14 +146,14 @@ function delete_beg!(x, delta=1)
 end
 
 """
-    delete_at!(collection, i::Int, n::Integer) -> Bool
+    shrink_at!(collection, i::Int, n::Integer) -> Bool
 
 Shrink `collection` by `n` elements at index `i`.  This does not ensure that new
 elements are defined. If successful this will return `true`.
 """
-function delete_at!(x, i, delta=1)
-    if can_delete_at(x, i, delta)
-        unsafe_delete_at!(x, i, delta)
+function shrink_at!(x, i, delta=1)
+    if can_shrink_at(x, i, delta)
+        unsafe_shrink_at!(x, i, delta)
         return true
     else
         return false
