@@ -29,12 +29,13 @@ function isshared(x::Array)
     return out
 end
 
-
 """
     shrink_end!(collection, n::Integer) -> Bool
 
 Deletes `n` elements from begining at the last index of `collection`. If successful will
 return `true`.
+
+See also: [`shrink_beg!`](@ref), [`shrink_at!`](@ref), [`unsafe_shrink_end!`](@ref)
 """
 shrink_end!(x, n::Integer) = false
 function shrink_end!(x::Vector, n::Integer)
@@ -61,6 +62,8 @@ end
     shrink_at!(collection, i::Int, n::Integer) -> Bool
 
 Shrink `collection` by `n` elements at index `i`. If successful this will return `true`.
+
+See also: [`shrink_beg!`](@ref), [`shrink_end!`](@ref), [`unsafe_shrink_at!`](@ref)
 """
 shrink_at!(x, i::Int, n::Integer) = false
 function shrink_at!(x::Vector, i::Int, n::Integer)
@@ -89,6 +92,8 @@ end
 
 Deletes `n` elements from the first index of `collection`. If successful will
 return `true`.
+
+See also: [`shrink_at!`](@ref), [`shrink_end!`](@ref), [`unsafe_shrink_beg!`](@ref)
 """
 shrink_beg!(x, n::Integer) = false
 function shrink_beg!(x::Vector, n::Integer)
@@ -116,6 +121,8 @@ end
 
 Grow `collection` by `n` elements at index `i`. This does not ensure that new
 elements are defined. If successful this will return true return `true`.
+
+See also: [`grow_beg!`](@ref), [`grow_end!`](@ref), [`unsafe_grow_at!`](@ref)
 """
 grow_at!(x, i, n::Integer) = false
 function grow_at!(x::Vector, i, n::Integer)
@@ -143,6 +150,8 @@ end
 
 Grow `collection` by `n` elements from its last index. This does not ensure that new
 elements are defined. If successful will return `true`.
+
+See also: [`grow_beg!`](@ref), [`grow_at!`](@ref), [`unsafe_grow_end!`](@ref)
 """
 grow_end!(x, n::Integer) = false
 grow_end!(x::Vector, n::Integer) = isshared(x) ? false : (unsafe_grow_end!(x, n); true)
@@ -163,6 +172,8 @@ end
 
 Grow `collection` by `n` elements from its first index. This does not ensure that new
 elements are defined. If successful will return `true`.
+
+See also: [`grow_at!`](@ref), [`grow_end!`](@ref), [`unsafe_grow_beg!`](@ref)
 """
 grow_beg!(x, n::Integer) = false
 grow_beg!(x::Vector, n::Integer) = isshared(x) ? false : (unsafe_grow_beg!(x, n); true)
@@ -176,6 +187,73 @@ $(UNSAFE_GROW_DOC)
 """
 @assume_effects :terminates_locally :nothrow function unsafe_grow_beg!(x::Vector, n)
     ccall(:jl_array_grow_end, Cvoid, (Any, UInt), x, n)
+end
+
+
+"""
+    assert_shrink_end!(collection, n::Integer) -> Nothing
+
+Executes `shrink_end!(collection, n)`, throwing an error if unsuccessful or `nothing` if
+successful.
+"""
+function assert_shrink_end!(x, n)
+    shrink_end!(x, n) && return nothing
+    throw(ArgumentError("$(x), cannot shrink from its last index by $(Int(n)) elements"))
+end
+
+"""
+    assert_shrink_beg!(collection, n::Integer) -> Nothing
+
+Executes `shrink_beg!(collection, n)`, throwing an error if unsuccessful or `nothing` if
+successful.
+"""
+function assert_shrink_beg!(x, n)
+    shrink_beg!(x, n) && return nothing
+    throw(ArgumentError("$(x), cannot shrink from its first index by $(Int(n)) elements"))
+end
+
+"""
+    assert_shrink_at!(collection, i::Int, n::Integer) -> Nothing
+
+Executes `shrink_at!(collection, i, n)`, throwing an error if unsuccessful or `nothing` if
+successful.
+"""
+function assert_shrink_at!(x, i, n)
+    shrink_at!(x, i, n) && return nothing
+    throw(ArgumentError("$(x), cannot shrink at index $(i) by $(Int(n)) elements"))
+end
+
+"""
+    assert_grow_end!!(collection, n::Integer) -> Nothing
+
+Executes `grow_end!(collection, n)`, throwing an error if unsuccessful or `nothing` if
+successful.
+"""
+function assert_grow_end!(x, n)
+    grow_end!(x, n) && return nothing
+    throw(ArgumentError("$(x), cannot grow from its last index by $(Int(n)) elements"))
+end
+
+"""
+    assert_grow_beg!(collection, n::Integer) -> Nothing
+
+Executes `grow_beg!(collection, n)`, throwing an error if unsuccessful or `nothing` if
+successful.
+"""
+function assert_grow_beg!(x, n)
+    grow_beg!(x, n) && return nothing
+    throw(ArgumentError("$(x), cannot grow from its first index by $(Int(n)) elements"))
+end
+
+"""
+    assert_grow_at!(collection, i::Int, n::Integer) -> Nothing
+
+Executes `grow_at!(collection, i, n)`, throwing an error if unsuccessful or `nothing` if
+successful.
+"""
+function assert_grow_at!(x, i, n)
+    grow_at!(x, i, n) && return nothing
+    throw(ArgumentError("$(x), cannot grow at index $(i) by $(Int(n)) elements"))
 end
 
 end
