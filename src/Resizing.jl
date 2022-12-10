@@ -2,207 +2,180 @@ module Resizing
 
 import Compat: @assume_effects
 
+const UNSAFE_GROW_DOC = """
+This method assumes that `collection` will grow without any errors and may result in
+undefined behavior if the user isn't certain `collection` can safely grow. For example, an
+instance of `Vector` cannot be shared with another instance of `Array` to change sizes.
+"""
+
+const UNSAFE_SHRINK_DOC = """
+This method assumes that `collection` will shrink without any errors and may result in
+undefined behavior if the user isn't certain `collection` can safely shrink. For example, an
+instance of `Vector` cannot be shared with another instance of `Array` to change sizes. It
+also assumes that the provided number of elements the will be removed does not exceed the
+size of `collection`.
+"""
+
 # https://github.com/JuliaLang/julia/issues/34478
 
 # TODO query if shared (`reshape`) so we can use `:nothrow` on `unsafe_*` methods
 # https://github.com/JuliaLang/julia/pull/47540
-
-"""
-    can_grow_beg(collection) -> Bool
-
-Return `true` if `collection` is an instance that can grow from its first index.
-"""
-can_grow_beg(x::Vector) = true
-can_grow_beg(x) = false
-
-"""
-    can_grow_end(collection) -> Bool
-
-Return `true` if `collection` is an instance that can grow from its last index.
-"""
-can_grow_end(x::Vector) = true
-can_grow_end(x) = false
-
-"""
-    can_grow_at(collection, i) -> Bool
-
-Return `true` if `collection` is an instance that can grow at index `i`.
-"""
-can_grow_at(x::Vector, i) = 1 <= i && i <= length(x)
-can_grow_at(x, i) = false
-
-"""
-    can_shrink_beg(collection, n) -> Bool
-
-Return `true` if `collection` can delete `n` elements from its first index.
-"""
-can_shrink_beg(x::Vector, delta) = length(x) - delta > 0
-can_shrink_beg(x, delta) = false
-
-"""
-    can_shrink_end(collection, n) -> Bool
-
-Return `true` if `collection` can delete `n` elements from its last index.
-"""
-can_shrink_end(x::Vector, delta) = length(x) - delta > 0
-can_shrink_end(x, delta) = false
-
-"""
-    can_shrink_at(collection, i, n) -> Bool
-
-Return `true` if `collection` can delete `n` elements from index, `i`.
-"""
-can_shrink_at(x::Vector, i, delta) = 1 <= i && (i + delta) <= length(x)
-can_shrink_at(x, i, delta) = false
-
-"""
-    unsafe_shrink_end!(collection, n)
-
-Deletes `n` elements from the last index of `collection`. This method assumes that
-`can_shrink_end(collection, n) == true`.
-"""
-@assume_effects :terminates_locally function unsafe_shrink_end!(x::Vector, delta)
-    ccall(:jl_array_del_end, Cvoid, (Any, UInt), x, delta)
+const FLAG_OFFSET = 1 + sizeof(Csize_t)>>1 + sizeof(Ptr{Cvoid}) >>1
+function isshared(x::Array)
+    ptr = pointer_from_objref(x)
+    GC.@preserve x begin
+        out = (unsafe_load(convert(Ptr{UInt16}, ptr), FLAG_OFFSET) & 0x4000) !== 0x0000
+    end
+    return out
 end
 
-"""
-    unsafe_shrink_beg!(collection, n)
-
-Deletes `n` elements from the first index of `collection`. This method assumes that
-`can_shrink_beg(collection, n) == true`.
-"""
-@assume_effects :terminates_locally function unsafe_shrink_beg!(x::Vector, delta)
-    ccall(:jl_array_del_beg, Cvoid, (Any, UInt), x, delta)
-end
 
 """
-    unsafe_shrink_at!(collection, i, n)
+    shrink_end!(collection, n::Integer) -> Bool
 
-Deletes `n` elements from index `i` of `collection`. This method assumes that
-`can_shrink_at(collection, i, n) == true`.
+Deletes `n` elements from begining at the last index of `collection`. If successful will
+return `true`.
 """
-@assume_effects :terminates_locally function unsafe_shrink_at!(x::Vector, i, delta)
-    ccall(:jl_array_del_at, Cvoid, (Any, Int, UInt), x, i-1, delta)
-end
-
-"""
-    unsafe_grow_beg!(collection, n)
-
-Grows by `n` elements at the first index of `collection`. This method assumes that
-`can_grow_beg(collection, n) == true`.
-"""
-@assume_effects :terminates_locally function unsafe_grow_beg!(x::Vector, delta)
-    ccall(:jl_array_grow_end, Cvoid, (Any, UInt), x, delta)
-end
-
-"""
-    unsafe_grow_end!(collection, n)
-
-Grows by `n` elements at the last index of `collection`. This method assumes that
-`can_grow_end(collection, n) == true`.
-"""
-@assume_effects :terminates_locally function unsafe_grow_end!(x::Vector, delta)
-    ccall(:jl_array_grow_end, Cvoid, (Any, UInt), x, delta)
-end
-
-"""
-    unsafe_grow_at!(collection, i, n)
-
-Grows by `n` elements at index `i` of `collection`. This method assumes that
-`can_grow_at(collection, i, n) == true`.
-"""
-@assume_effects :terminates_locally function unsafe_grow_at!(x::Vector, i::Int, delta)
-    ccall(:jl_array_grow_at, Cvoid, (Any, Int, UInt), x, i-1, delta)
-end
-
-"""
-    shrink_end!(collection, n::Integer=1) -> Bool
-
-Deletes `n` elements from begining at the last index of `collection`.
-If successful this will return `true`.
-"""
-function shrink_end!(x, delta=1)
-    if can_shrink_end(x, delta)
-        unsafe_shrink_end!(x, delta)
-        return true
-    else
+shrink_end!(x, n::Integer) = false
+function shrink_end!(x::Vector, n::Integer)
+    if isshared(x) || (length(x) - n) < 0
         return false
+    else
+        unsafe_shrink_end!(x, n)
+        return true
     end
 end
 
 """
-    grow_beg!(collection, n::Integer=1) -> Bool
+    unsafe_shrink_end!(collection, n::Integer) -> Nothing
 
-Grow `collection` by `n` elements from its first index. This does not ensure that new
-elements are defined. If successful this will return `true`.
+Deletes `n` elements from the last index of `collection`.
+
+$(UNSAFE_SHRINK_DOC)
 """
-function shrink_beg!(x, delta=1)
-    if can_shrink_beg(x, delta)
-        unsafe_shrink_beg!(x, delta)
-        return true
-    else
-        return false
-    end
+@assume_effects :terminates_locally :nothrow function unsafe_shrink_end!(x::Vector, n::Integer)
+    ccall(:jl_array_del_end, Cvoid, (Any, UInt), x, n)
 end
 
 """
     shrink_at!(collection, i::Int, n::Integer) -> Bool
 
-Shrink `collection` by `n` elements at index `i`.  This does not ensure that new
-elements are defined. If successful this will return `true`.
+Shrink `collection` by `n` elements at index `i`. If successful this will return `true`.
 """
-function shrink_at!(x, i, delta=1)
-    if can_shrink_at(x, i, delta)
-        unsafe_shrink_at!(x, i, delta)
-        return true
-    else
+shrink_at!(x, i::Int, n::Integer) = false
+function shrink_at!(x::Vector, i::Int, n::Integer)
+    if isshared(x) || i < 1 || (i + n) > length(x)
         return false
+    else
+        unsafe_shrink_at!(x, i, n)
+        return true
     end
 end
 
 """
-    grow_at!(collection, i::Int, n::Integer=1) -> Bool
+    unsafe_shrink_at!(collection, i, n::Integer) -> Nothing
+
+Deletes `n` elements from index `i` of `collection`.
+
+$(UNSAFE_SHRINK_DOC)
+"""
+@assume_effects :terminates_locally :nothrow function unsafe_shrink_at!(x::Vector, i, n::Integer)
+    ccall(:jl_array_del_at, Cvoid, (Any, Int, UInt), x, i-1, n)
+end
+
+
+"""
+    shrink_beg!(collection, n::Integer) -> Bool
+
+Deletes `n` elements from the first index of `collection`. If successful will
+return `true`.
+"""
+shrink_beg!(x, n::Integer) = false
+function shrink_beg!(x::Vector, n::Integer)
+    if isshared(x) || (length(x) - n) < 0
+        return false
+    else
+        unsafe_shrink_beg!(x, n)
+        return true
+    end
+end
+
+"""
+    unsafe_shrink_beg!(collection, n::Integer) -> Nothing
+
+Deletes `n` elements from the first index of `collection`.
+
+$(UNSAFE_SHRINK_DOC)
+"""
+@assume_effects :terminates_locally :nothrow function unsafe_shrink_beg!(x::Vector, n::Integer)
+    ccall(:jl_array_del_beg, Cvoid, (Any, UInt), x, n)
+end
+
+"""
+    grow_at!(collection, i::Int, n::Integer) -> Bool
 
 Grow `collection` by `n` elements at index `i`. This does not ensure that new
 elements are defined. If successful this will return true return `true`.
 """
-function grow_at!(x, i, delta=1)
-    if can_grow_at(x, i)
-        unsafe_grow_at!(x, i, delta)
-        return true
-    else
+grow_at!(x, i, n::Integer) = false
+function grow_at!(x::Vector, i, n::Integer)
+    if isshared(x) || 1 > i || i > (length(x) + 1)
         return false
+    else
+        unsafe_grow_at!(x, i, n)
+        return true
     end
 end
 
 """
-    grow_end!(collection, n::Integer=1) -> Bool
+    unsafe_grow_at!(collection, i::Int, n::Integer) -> Nothing
+
+Grows by `n` elements at index `i` of `collection`.
+
+$(UNSAFE_GROW_DOC)
+"""
+@assume_effects :terminates_locally :nothrow function unsafe_grow_at!(x::Vector, i::Int, n::Integer)
+    ccall(:jl_array_grow_at, Cvoid, (Any, Int, UInt), x, i-1, n)
+end
+
+"""
+    grow_end!(collection, n::Integer) -> Bool
 
 Grow `collection` by `n` elements from its last index. This does not ensure that new
-elements are defined. If successful this will return `true`.
+elements are defined. If successful will return `true`.
 """
-function grow_end!(x, delta=1)
-    if can_grow_end(x)
-        unsafe_grow_end!(x, delta)
-        return true
-    else
-        return false
-    end
+grow_end!(x, n::Integer) = false
+grow_end!(x::Vector, n::Integer) = isshared(x) ? false : (unsafe_grow_end!(x, n); true)
+
+"""
+    unsafe_grow_end!(collection, n) -> Nothing
+
+Grows by `n` elements at the last index of `collection`. 
+
+$(UNSAFE_GROW_DOC)
+"""
+@assume_effects :terminates_locally :nothrow function unsafe_grow_end!(x::Vector, n)
+    ccall(:jl_array_grow_end, Cvoid, (Any, UInt), x, n)
 end
 
 """
-    grow_beg!(collection, n::Integer=1) -> Bool
+    grow_beg!(collection, n::Integer) -> Bool
 
 Grow `collection` by `n` elements from its first index. This does not ensure that new
-elements are defined. If successful thiw will return `true`.
+elements are defined. If successful will return `true`.
 """
-function grow_beg!(x, delta=1)
-    if can_grow_beg(x)
-        unsafe_grow_beg!(x, delta)
-        return true
-    else
-        return false
-    end
+grow_beg!(x, n::Integer) = false
+grow_beg!(x::Vector, n::Integer) = isshared(x) ? false : (unsafe_grow_beg!(x, n); true)
+
+"""
+    unsafe_grow_beg!(collection, n) -> Nothing
+
+Grows by `n` elements at the first index of `collection`.
+
+$(UNSAFE_GROW_DOC)
+"""
+@assume_effects :terminates_locally :nothrow function unsafe_grow_beg!(x::Vector, n)
+    ccall(:jl_array_grow_end, Cvoid, (Any, UInt), x, n)
 end
 
 end

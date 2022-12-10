@@ -18,6 +18,7 @@ end
 @testset "grow_at!" begin
     v = Vector{Int}(undef, 10)
     @test !Resizing.grow_at!(1:2, 2, 2)
+    @test !Resizing.grow_at!(v, 12, 2)
     @test Resizing.grow_at!(v, 2, 2)
     @test length(v) == 12
 end
@@ -39,6 +40,7 @@ end
 @testset "shrink_at!" begin
     v = Vector{Int}(undef, 10)
     @test !Resizing.shrink_at!(1:2, 2, 2)
+    @test !Resizing.shrink_at!(v, 2, 9)
     @test Resizing.shrink_at!(v, 2, 2)
     @test length(v) == 8
 end
