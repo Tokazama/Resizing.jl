@@ -17,9 +17,7 @@ size of `collection`.
 """
 
 # https://github.com/JuliaLang/julia/issues/34478
-
-# TODO query if shared (`reshape`) so we can use `:nothrow` on `unsafe_*` methods
-# https://github.com/JuliaLang/julia/pull/47540
+# FIXME is hacky. should replace with https://github.com/JuliaLang/julia/pull/47540
 const FLAG_OFFSET = 1 + sizeof(Csize_t)>>1 + sizeof(Ptr{Cvoid}) >>1
 function isshared(x::Array)
     ptr = pointer_from_objref(x)
